@@ -1,0 +1,16 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.sqlite3
+
+# VS Code
+.vscode/
+
+# Node (if using later)
+node_modules/
+
+# GitHub internal folders
+.github/

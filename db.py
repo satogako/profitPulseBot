@@ -46,3 +46,11 @@ def calculate_daily_summary():
         val['net'] = val['profit'] + val['loss']
 
     return summary
+
+
+def clear_db():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM pnl")
+    conn.commit()
+    conn.close()

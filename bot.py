@@ -106,6 +106,19 @@ async def set_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ Daily summary time set to {hour:02d}:{minute:02d}")
 
 
+async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Зупиняємо всі задачі планувальника
+    for job in scheduler.get_jobs():
+        job.remove()
+
+    # Очищаємо базу
+    clear_db()
+
+    # Повідомляємо користувача
+    await update.message.reply_text("🔄 All data and scheduled jobs have been reset.")
+
+
+
 if __name__ == "__main__":
     create_db()
     app = ApplicationBuilder().token(TOKEN).build()
@@ -114,6 +127,7 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     print("🤖 Bot has started...")
     app.add_handler(CommandHandler("set_time", set_time))
+    app.add_handler(CommandHandler("reset", reset))
     scheduler.add_job(send_daily_summary, 'date', run_date=run_time, args=[app.bot, YOUR_CHAT_ID])
     scheduler.start()
     app.run_polling()

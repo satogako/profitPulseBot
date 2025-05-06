@@ -73,6 +73,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def manual_calc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     summary = calculate_daily_summary()
+
+    if not summary:
+        await update.message.reply_text("📭 You have no realized PNL orders for today.")
+        return
+    
     msg = "📊 Manual Summary by Currency:\n"
 
     for currency, data in summary.items():

@@ -7,19 +7,20 @@ from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 from db import create_db, save_to_db, calculate_daily_summary, clear_db
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from telegram.constants import ParseMode
 from utils import parse_pnl_message
 from datetime import datetime, timedelta
 
 # Для ТЕСТУ: запускає через 2 хвилини після старту
-run_time = datetime.now() + timedelta(minutes=1)
+#run_time = datetime.now() + timedelta(minutes=1)
 
 
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 YOUR_CHAT_ID = int(os.getenv("YOUR_CHAT_ID"))
-scheduler = BackgroundScheduler()
+scheduler = AsyncIOScheduler()
+
 
 
 logging.basicConfig(
@@ -29,15 +30,14 @@ logging.basicConfig(
 
 
 def schedule_daily_summary(hour: int, minute: int, bot, chat_id):
-    # Видаляємо старі задачі
     for job in scheduler.get_jobs():
         job.remove()
 
     trigger = CronTrigger(hour=hour, minute=minute)
-    scheduler.add_job(send_daily_summary, trigger=trigger, args=[bot, chat_id])
+    scheduler.add_job(send_daily_summary, trigger=trigger, kwargs={"bot": bot, "chat_id": chat_id})
 
 
-def send_daily_summary(bot, chat_id):
+async def send_daily_summary(bot, chat_id):
     summary = calculate_daily_summary()
     if not summary:
         return
@@ -51,13 +51,12 @@ def send_daily_summary(bot, chat_id):
             f"📈 Net: `{data['net']:.4f}`\n"
         )
 
-    asyncio.run(bot.send_message(chat_id=chat_id, text=msg, parse_mode=ParseMode.MARKDOWN))
+    await bot.send_message(chat_id=chat_id, text=msg, parse_mode=ParseMode.MARKDOWN)
     clear_db()
 
 
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Hello! I am a bot for tracking profit 💰")
+    await update.message.reply_text("Hello! I am a Profit Pulse Bot for tracking profit 💰")
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -119,15 +118,28 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
+async def post_init(app):
+    scheduler.add_job(
+        send_daily_summary,
+        trigger='date',
+        #run_date=run_time,
+        kwargs={"bot": app.bot, "chat_id": YOUR_CHAT_ID}
+    )
+    scheduler.start()
+
+
 if __name__ == "__main__":
     create_db()
-    app = ApplicationBuilder().token(TOKEN).build()
+
+    app = ApplicationBuilder().token(TOKEN).post_init(post_init).build()
+
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("manual_calc", manual_calc))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    print("🤖 Bot has started...")
     app.add_handler(CommandHandler("set_time", set_time))
     app.add_handler(CommandHandler("reset", reset))
-    scheduler.add_job(send_daily_summary, 'date', run_date=run_time, args=[app.bot, YOUR_CHAT_ID])
-    scheduler.start()
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    print("🤖 Bot has started...")
     app.run_polling()
+
+

@@ -1,6 +1,8 @@
 import logging
 import asyncio
 import os
+import re
+from apscheduler.triggers.cron import CronTrigger
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
@@ -24,6 +26,15 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO
 )
+
+
+def schedule_daily_summary(hour: int, minute: int, bot, chat_id):
+    # Видаляємо старі задачі
+    for job in scheduler.get_jobs():
+        job.remove()
+
+    trigger = CronTrigger(hour=hour, minute=minute)
+    scheduler.add_job(send_daily_summary, trigger=trigger, args=[bot, chat_id])
 
 
 def send_daily_summary(bot, chat_id):
@@ -76,6 +87,25 @@ async def manual_calc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, parse_mode='Markdown')
 
 
+async def set_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    bot = context.bot
+
+    if not context.args or not re.match(r"^\d{1,2}:\d{2}$", context.args[0]):
+        await update.message.reply_text("⚠️ Use format: /set_time HH:MM (24h format)")
+        return
+
+    time_str = context.args[0]
+    hour, minute = map(int, time_str.split(":"))
+
+    if not (0 <= hour < 24 and 0 <= minute < 60):
+        await update.message.reply_text("⛔️ Invalid time. Use HH:MM in 24h format.")
+        return
+
+    schedule_daily_summary(hour, minute, bot, chat_id)
+    await update.message.reply_text(f"✅ Daily summary time set to {hour:02d}:{minute:02d}")
+
+
 if __name__ == "__main__":
     create_db()
     app = ApplicationBuilder().token(TOKEN).build()
@@ -83,6 +113,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("manual_calc", manual_calc))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     print("🤖 Bot has started...")
+    app.add_handler(CommandHandler("set_time", set_time))
     scheduler.add_job(send_daily_summary, 'date', run_date=run_time, args=[app.bot, YOUR_CHAT_ID])
     scheduler.start()
     app.run_polling()

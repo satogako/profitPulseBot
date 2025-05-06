@@ -40,7 +40,8 @@ def schedule_daily_summary(hour: int, minute: int, bot, chat_id):
 async def send_daily_summary(bot, chat_id):
     summary = calculate_daily_summary()
     if not summary:
-        return
+        logging.info(f"No data to send for chat {chat_id}")
+        return  # нічого не надсилати
 
     msg = "📊 Daily Summary:\n"
     for currency, data in summary.items():

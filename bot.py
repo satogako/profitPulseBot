@@ -1,7 +1,9 @@
-import logging
-import asyncio
 import os
 import re
+import json
+import logging
+import asyncio
+from pathlib import Path
 from apscheduler.triggers.cron import CronTrigger
 from dotenv import load_dotenv
 from telegram import Update
@@ -20,6 +22,7 @@ load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 YOUR_CHAT_ID = int(os.getenv("YOUR_CHAT_ID"))
 scheduler = AsyncIOScheduler()
+SETTINGS_FILE = "settings.json"
 
 
 
@@ -27,6 +30,17 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO
 )
+
+
+def load_settings():
+    if not os.path.exists(SETTINGS_FILE):
+        return {}
+    with open(SETTINGS_FILE, "r") as f:
+        return json.load(f)
+
+def save_settings(settings):
+    with open(SETTINGS_FILE, "w") as f:
+        json.dump(settings, f)
 
 
 def schedule_daily_summary(hour: int, minute: int, bot, chat_id):
@@ -123,6 +137,22 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔄 All data and scheduled jobs have been reset.")
 
 
+async def set_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args or not context.args[0].lstrip("+-").isdigit():
+        await update.message.reply_text("⚠️ Use format: /set_timezone +3 or /set_timezone -5")
+        return
+
+    offset = int(context.args[0])
+    if not -12 <= offset <= 14:
+        await update.message.reply_text("⛔️ Invalid timezone offset. Must be between -12 and +14.")
+        return
+
+    settings = load_settings()
+    settings["timezone_offset"] = offset
+    save_settings(settings)
+
+    await update.message.reply_text(f"🌍 Timezone offset set to UTC{offset:+}")
+
 
 async def post_init(app):
     scheduler.add_job(
@@ -144,7 +174,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("set_time", set_time))
     app.add_handler(CommandHandler("reset", reset))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
+    app.add_handler(CommandHandler("set_timezone", set_timezone))
     print("🤖 Bot has started...")
     app.run_polling()
 

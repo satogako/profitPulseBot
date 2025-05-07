@@ -44,11 +44,25 @@ def save_settings(settings):
 
 
 def schedule_daily_summary(hour: int, minute: int, bot, chat_id):
+    # Завантажуємо timezone offset
+    settings = load_settings()
+    offset = settings.get("timezone_offset", 0)
+
+    # Перерахунок часу до UTC
+    utc_hour = (hour - offset) % 24
+
+    # Видаляємо попередні задачі
     for job in scheduler.get_jobs():
         job.remove()
 
-    trigger = CronTrigger(hour=hour, minute=minute)
-    scheduler.add_job(send_daily_summary, trigger=trigger, kwargs={"bot": bot, "chat_id": chat_id})
+    # Створюємо тригер з урахуванням UTC
+    trigger = CronTrigger(hour=utc_hour, minute=minute)
+
+    scheduler.add_job(
+        send_daily_summary,
+        trigger=trigger,
+        kwargs={"bot": bot, "chat_id": chat_id}
+    )
 
 
 async def send_daily_summary(bot, chat_id):

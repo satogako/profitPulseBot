@@ -187,6 +187,33 @@ async def post_init(app):
     )
     scheduler.start()
 
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    help_text = (
+        "🆘 *Довідка / Help*\n\n"
+
+        "🇺🇦 _Доступні команди:_\n"
+        "`/start` – Запустити бота\n"
+        "`/set_timezone Europe/Kyiv` – Встановити часовий пояс\n"
+        "`/set_time 13:00` – Встановити час надсилання щоденного звіту\n"
+        "`/manual_calc` – Отримати звіт вручну\n"
+        "`/reset` – Скинути дані та розклад\n"
+        "`/timezone_help` – Приклади назв таймзон\n"
+        "`/help` – Показати довідку\n\n"
+
+        "🇬🇧 _Available commands:_\n"
+        "`/start` – Start the bot\n"
+        "`/set_timezone Europe/Kyiv` – Set timezone\n"
+        "`/set_time 13:00` – Set daily report time\n"
+        "`/manual_calc` – Get report manually\n"
+        "`/reset` – Reset data and schedule\n"
+        "`/timezone_help` – Timezone name examples\n"
+        "`/help` – Show help info"
+    )
+
+    await update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN)
+
+
 if __name__ == "__main__":
     create_db()
 
@@ -199,5 +226,6 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CommandHandler("set_timezone", set_timezone))
     app.add_handler(CommandHandler("timezone_help", timezone_help))
+    app.add_handler(CommandHandler("help", help_command))
     print("🤖 Bot has started...")
     app.run_polling()

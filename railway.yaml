@@ -1,0 +1,21 @@
+# Define the build and start commands
+build:
+  builder: nixpacks
+  nixpacksConfig:
+    phases:
+      install:
+        commands:
+          - pip install -r requirements.txt
+
+start:
+  cmd: python bot.py
+
+# Define environment variables (optional if you use .env)
+envVars:
+  - TELEGRAM_BOT_TOKEN
+  - YOUR_CHAT_ID
+
+# Define resources limits
+resources:
+  cpu: 0.5
+  memory: 1GB

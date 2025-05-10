@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import pytz
 import logging
 import asyncio
 from pathlib import Path
@@ -12,8 +13,8 @@ from db import create_db, save_to_db, calculate_daily_summary, clear_db
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from telegram.constants import ParseMode
 from utils import parse_pnl_message
-from datetime import datetime, timedelta
-import pytz
+from datetime import datetime, timedelta, timezone
+
 
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -67,6 +68,41 @@ def schedule_daily_summary(hour: int, minute: int, bot, chat_id):
     logging.info(f"📅 Daily summary scheduled for {target_utc.strftime('%Y-%m-%d %H:%M')} UTC")
     logging.info(f"⏰ Local time set by user: {hour:02d}:{minute:02d} ({timezone_name})")
 
+
+def schedule_manual_cleanup(chat_id, bot):
+    settings = load_settings()
+    tz_name = settings.get("timezone_name", "UTC")
+
+    try:
+        user_tz = pytz.timezone(tz_name)
+    except Exception:
+        user_tz = pytz.utc
+
+    # Отримуємо "завтрашню" 23:59:00 в локальному часі
+    now = datetime.now(user_tz)
+    target_local = now.replace(hour=4, minute=48, second=55, microsecond=0)
+    if target_local <= now:
+        target_local += timedelta(days=1)
+
+    # Переводимо в UTC
+    target_utc = target_local.astimezone(pytz.utc)
+
+    trigger = CronTrigger(
+        hour=target_utc.hour,
+        minute=target_utc.minute,
+        timezone=pytz.utc
+    )
+
+    scheduler.add_job(
+        manual_cleanup_job,
+        trigger=trigger,
+        kwargs={"chat_id": chat_id},
+        id="manual_cleanup",
+        replace_existing=True
+    )
+    logging.info(f"🧹 Manual cleanup scheduled for {target_utc.strftime('%H:%M')} UTC / {target_local.strftime('%H:%M')} local")
+
+
 async def send_daily_summary(bot, chat_id):
     summary = calculate_daily_summary()
     if not summary:
@@ -85,8 +121,19 @@ async def send_daily_summary(bot, chat_id):
     await bot.send_message(chat_id=chat_id, text=msg, parse_mode=ParseMode.MARKDOWN)
     clear_db()
 
+
+async def manual_cleanup_job(chat_id):
+    settings = load_settings()
+    if settings.get("manual_cleanup", False):
+        clear_db()
+        logging.info(f"🧹 Daily manual cleanup executed for chat {chat_id}")
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Hello! I am a Profit Pulse Bot for tracking profit 💰")
+    await update.message.reply_text("Hello! I am a Profit Pulse Bot for tracking profit 💰\n" \
+        "The bot will start working after you set your timezone.\n" \
+        "Use the command /timezone_help or use the /help.\n" \
+    )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message.text
@@ -137,6 +184,9 @@ async def set_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not (0 <= hour < 24 and 0 <= minute < 60):
         await update.message.reply_text("⛔️ Invalid time. Use HH:MM in 24h format.")
         return
+    
+    settings["manual_cleanup"] = False
+    save_settings(settings)
 
     schedule_daily_summary(hour, minute, bot, chat_id)
     await update.message.reply_text(f"✅ Daily summary time set to {hour:02d}:{minute:02d} (your local time)")
@@ -145,6 +195,11 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for job in scheduler.get_jobs():
         job.remove()
     clear_db()
+    settings = load_settings()
+    settings["manual_cleanup"] = True
+    save_settings(settings)
+    schedule_manual_cleanup(update.effective_chat.id, context.bot)
+
     await update.message.reply_text("🔄 All data and scheduled jobs have been reset.")
 
 async def set_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -169,7 +224,7 @@ async def timezone_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = (
         "🕰 To set your timezone, use the command like this:\n"
         "`/set_timezone Europe/Kyiv`\n\n"
-        "🔤 Timezone names are case-sensitive and must be in the format `Region/City`.\n"
+        "🔤 Timezone names must be in the format `Region/City`.\n"
         "Some common examples:\n"
         "- `Europe/Kyiv`\n"
         "- `Europe/London`\n"
@@ -186,6 +241,9 @@ async def post_init(app):
         kwargs={"bot": app.bot, "chat_id": YOUR_CHAT_ID}
     )
     scheduler.start()
+    settings = load_settings()
+    if settings.get("manual_cleanup", False):
+        schedule_manual_cleanup(YOUR_CHAT_ID, app.bot)
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):

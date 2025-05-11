@@ -126,30 +126,94 @@ async def send_daily_summary(bot, chat_id):
     clear_db()
 
 
-async def manual_cleanup_job(chat_id):
-    settings = load_settings()
-    if settings.get("manual_cleanup", False):
-        clear_db()
-        logging.info(f"🧹 Daily manual cleanup executed for chat {chat_id}")
-
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = (
-        "👋 Welcome to Profit Pulse Bot!\n\n"
-        "To get started:\n\n"
-        "1️⃣ Set your timezone:\n"
-        "/set_timezone Europe/Kyiv\n\n"
-        "2️⃣ Set daily report time:\n"
-        "/set_time 13:00\n\n"
-        "3️⃣ Get your daily summary (for today only):\n"
-        "/manual_calc\n\n"
-        "4️⃣ Reset data and stop daily reports:\n"
-        "/reset\n\n"
-        "ℹ️ Full command list:\n"
-        "/help"
+    msg1 = (
+        "🎯 *Profit Pulse Bot — бот для обліку прибутків та збитків з ордерів*\n\n"
+
+        "*💾 Зберігання ордерів*\n"
+        "➤ Зчитує повідомлення `Realized PNL` із вашого P&L-чату після встановлення таймзони\n"
+        "➤ Якщо таймзону не встановлено — повідомлення ігноруються, бот попереджає\n\n"
+
+        "*📊 Підрахунок денного прибутку/збитку*\n"
+        "➤ Автозвіт щодня у зручний для вас час\n"
+        "➤ Підсумок *по кожній валюті* (USDT, BTC, ETH...)\n\n"
+
+        "*🧮 Ручний підрахунок (сьогодні)*\n"
+        "➤ Команда `/manual_calc` покаже прибуток/збиток лише за поточну добу\n"
+        "➤ Підсумок *по кожній валюті окремо*\n\n"
+
+        "*🧹 Режим ручного очищення*\n"
+        "➤ Якщо не заданий автозвіт — база очищається щодня о 23:59 (локально)\n"
+        "➤ Активується також після `/reset`\n\n"
+
+        "*🧭 Основні команди:* `/help`, `/set_timezone`, `/manual_calc` тощо\n\n"
+        "*☑️ Як додати меню команд (спадаюче меню, як у BotFather):*\n\n"
+        "Введіть у BotFather: `/setcommands`, знайдіть свого бота та вставте разом ці команди:\n"
+        "⬇️ Надішлю зараз список команд окремо для зручного копіювання 👇"
     )
 
-    await update.message.reply_text(msg)
+    msg2 = (
+        "`start - Start instruction`\n"
+        "`set_timezone - Set your timezone`\n"
+        "`set_time - Set daily report time`\n"
+        "`manual_calc - Show profit/loss for today`\n"
+        "`reset - Reset all data and schedule`\n"
+        "`timezone_help - Example timezone names`\n"
+        "`help - Show help info`"
+    )
+
+    await update.message.reply_text(msg1, parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_text(msg2, parse_mode=ParseMode.MARKDOWN)
+
+
+# async def manual_cleanup_job(chat_id):
+#     settings = load_settings()
+#     if settings.get("manual_cleanup", False):
+#         clear_db()
+#         logging.info(f"🧹 Daily manual cleanup executed for chat {chat_id}")
+
+
+# async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+#     msg = (
+#         "🎯 *Profit Pulse Bot — бот для обліку прибутків та збитків з ордерів*\n\n"
+
+#         "*💾 Зберігання ордерів*\n"
+#         "➤ Зчитує повідомлення `Realized PNL` із вашого PNL бота після встановлення таймзони\n"
+#         "➤ Якщо таймзону не встановлено — повідомлення ігноруються, бот попереджає\n\n"
+
+#         "*📊 Підрахунок денного прибутку/збитку*\n"
+#         "➤ Автозвіт щодня у зручний для вас час\n"
+#         "➤ Підсумок *по кожній валюті* (USDT, BTC, ETH...)\n\n"
+
+#         "*🧮 Ручний підрахунок (сьогодні)*\n"
+#         "➤ Команда `/manual_calc` покаже прибуток/збиток лише за поточну добу\n"
+#         "➤ Підсумок *по кожній валюті окремо*\n\n"
+
+#         "*🧹 Режим ручного очищення*\n"
+#         "➤ Якщо не заданий автозвіт — база очищається щодня о 23:59 (локально)\n"
+#         "➤ Активується також після `/reset`\n\n"
+
+#         "*🧭 Команди:*\n"
+#         "`/start` — Інструкція\n"
+#         "`/set_timezone Europe/Kyiv` — Встановити таймзону\n"
+#         "`/set_time 13:00` — Установити час автозвіту\n"
+#         "`/manual_calc` — Підрахунок за сьогодні\n"
+#         "`/reset` — Скидання даних і розкладу\n"
+#         "`/timezone_help` — Приклади назв таймзон\n"
+#         "`/help` — Довідка по всіх командах\n\n"
+
+#         "*☑️ Як додати меню команд (спадаюче меню, як у BotFather):*\n"
+#         "Введіть у BotFather: `/setcommands`, знайдіть свого бота та вставте разом ці команди:\n\n"
+#         "start - Start instruction\n"
+#         "set_timezone - Set your timezone\n"
+#         "set_time - Set daily report time\n"
+#         "manual_calc - Show profit/loss for today\n"
+#         "reset - Reset all data and schedule\n"
+#         "timezone_help - Example timezone names\n"
+#         "help - Show help info"
+#     )
+
+#     await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):

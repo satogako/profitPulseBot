@@ -134,10 +134,22 @@ async def manual_cleanup_job(chat_id):
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Hello! I am a Profit Pulse Bot for tracking profit 💰\n" \
-        "The bot will start working after you set your timezone.\n" \
-        "Use the command /timezone_help or use the /help.\n" \
+    msg = (
+        "👋 Welcome to Profit Pulse Bot!\n\n"
+        "To get started:\n\n"
+        "1️⃣ Set your timezone:\n"
+        "/set_timezone Europe/Kyiv\n\n"
+        "2️⃣ Set daily report time:\n"
+        "/set_time 13:00\n\n"
+        "3️⃣ Get your daily summary (for today only):\n"
+        "/manual_calc\n\n"
+        "4️⃣ Reset data and stop daily reports:\n"
+        "/reset\n\n"
+        "ℹ️ Full command list:\n"
+        "/help"
     )
+
+    await update.message.reply_text(msg)
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -157,7 +169,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if parsed:
             pair, amount, currency = parsed
             save_to_db(pair, amount, currency)
-            await update.message.reply_text(f"Saved: {pair} {amount}{currency}")
+            #await update.message.reply_text(f"Saved: {pair} {amount}{currency}")
         else:
             await update.message.reply_text("⚠️ Message format not recognized.")
 

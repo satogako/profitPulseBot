@@ -22,10 +22,12 @@ YOUR_CHAT_ID = int(os.getenv("YOUR_CHAT_ID"))
 scheduler = AsyncIOScheduler()
 SETTINGS_FILE = "settings.json"
 
+
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO
 )
+
 
 def load_settings():
     if not os.path.exists(SETTINGS_FILE):
@@ -33,9 +35,11 @@ def load_settings():
     with open(SETTINGS_FILE, "r") as f:
         return json.load(f)
 
+
 def save_settings(settings):
     with open(SETTINGS_FILE, "w") as f:
         json.dump(settings, f)
+
 
 def schedule_daily_summary(hour: int, minute: int, bot, chat_id):
     settings = load_settings()
@@ -80,7 +84,7 @@ def schedule_manual_cleanup(chat_id, bot):
 
     # Отримуємо "завтрашню" 23:59:00 в локальному часі
     now = datetime.now(user_tz)
-    target_local = now.replace(hour=4, minute=48, second=55, microsecond=0)
+    target_local = now.replace(hour=23, minute=59, second=0, microsecond=0)
     if target_local <= now:
         target_local += timedelta(days=1)
 
@@ -135,8 +139,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Use the command /timezone_help or use the /help.\n" \
     )
 
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message.text
+
+    # Перевірка таймзони
+    settings = load_settings()
+    if "timezone_name" not in settings:
+        await update.message.reply_text(
+            "⚠️ Your timezone is not set. P&L messages are not being saved.\n"
+            "🌍 Please set your timezone using /set_timezone Europe/Kyiv to start tracking profit/loss messages."
+        )
+        return
+
     if "Realized PNL" in msg:
         parsed = parse_pnl_message(msg)
         if parsed:
@@ -146,7 +161,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text("⚠️ Message format not recognized.")
 
+
 async def manual_calc(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    settings = load_settings()
+    if "timezone_name" not in settings:
+        await update.message.reply_text(
+            "⛔️ You must set your timezone before using this command.\n"
+            "Use /set_timezone Europe/Kyiv."
+        )
+        return
+
     summary = calculate_daily_summary()
 
     if not summary:
@@ -164,6 +188,7 @@ async def manual_calc(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     await update.message.reply_text(msg, parse_mode='Markdown')
+
 
 async def set_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
@@ -191,16 +216,27 @@ async def set_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     schedule_daily_summary(hour, minute, bot, chat_id)
     await update.message.reply_text(f"✅ Daily summary time set to {hour:02d}:{minute:02d} (your local time)")
 
+
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    settings = load_settings()
+
+    if "timezone_name" not in settings:
+        await update.message.reply_text(
+            "⛔️ You must set your timezone first using /set_timezone Europe/Kyiv before resetting the bot."
+        )
+        return
+
     for job in scheduler.get_jobs():
         job.remove()
+
     clear_db()
-    settings = load_settings()
+
     settings["manual_cleanup"] = True
     save_settings(settings)
     schedule_manual_cleanup(update.effective_chat.id, context.bot)
 
     await update.message.reply_text("🔄 All data and scheduled jobs have been reset.")
+
 
 async def set_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
@@ -219,6 +255,17 @@ async def set_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_settings(settings)
 
     await update.message.reply_text(f"🌍 Timezone set to {tz_corrected}")
+
+        # Якщо manual_cleanup відсутній — то True (юзер ще не встановив автозвіт)
+    if "manual_cleanup" not in settings:
+        settings["manual_cleanup"] = True
+        save_settings(settings)
+        logging.info("🧹 Enabled manual cleanup mode (default after timezone set)")
+        schedule_manual_cleanup(update.effective_chat.id, context.bot)
+
+    elif settings.get("manual_cleanup", False):
+        schedule_manual_cleanup(update.effective_chat.id, context.bot)
+
 
 async def timezone_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = (
